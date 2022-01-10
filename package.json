@@ -1,0 +1,10 @@
+{
+  "name": "looker",
+  "private": true,
+  "dependencies": {
+    "@looker/look-at-me-sideways": "^1.6.1"
+  },
+  "scripts": {
+    "lint": "lams --reporting=no"
+  }
+}

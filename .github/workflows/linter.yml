@@ -1,0 +1,62 @@
+name: ci
+
+on: 
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Linter
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup Node
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Install dependencies
+      run: yarn install
+
+    - name: Get .lkml changed files
+      uses: Ana06/get-changed-files@v2.0.0
+      id: changed_files
+      with:
+        format: 'csv'
+        filter: '*.lkml'
+
+    - name: Remove .lkml extension from changed files
+      id: lkml_changed_files
+      run: |
+        echo "::set-output name=added_modified::$(echo ${{ steps.changed_files.outputs.added_modified }} | sed -e 's/.lkml//g' | xargs)"
+    - name: Run linter
+      run: yarn lint --source='**/{*.model,${{ steps.lkml_changed_files.outputs.added_modified }},manifest}.lkml'
+
+    - name: Get number of characters from issues.md
+      id: issues_md
+      if: always()
+      run: echo "::set-output name=char_count::$(wc -m < issues.md)"
+
+    - name: Issues check action
+      uses: LouisBrunner/checks-action@v1.2.0
+      # Check Runs text has a limit of 65535 chars, so we will only try to create a check run if 
+      # the char count of the issues.md file is less than 65500.
+      if: always() && (steps.issues_md.outputs.char_count <= 65500) 
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: Linter Report
+        conclusion: ${{ job.status }}
+        output_text_description_file: issues.md
+        output: |
+          { 
+            "summary": "Found the Following issues"
+          }
+    - name: Upload issues as an artifact
+      uses: actions/upload-artifact@v2.2.4
+      # If the char count of the issues.md file is higher than 65500 we won't create a Check Run
+      # but still want to show the issues in some way, upload the .md file as an artifact that can be downloaded.
+      if: always() && (steps.issues_md.outputs.char_count > 65500)
+      with:
+        name: issues
+        path: issues.md
